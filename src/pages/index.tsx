@@ -6,17 +6,30 @@ type Position = {
   y: number;
 };
 
-const Button = (message: string, onClick: () => void) => (
-  <button
-    onClick={onClick}
-    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-  >
-    {message}
-  </button>
-);
+const Button = ({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: any;
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      className="mx-1 bg-yellow-200 hover:bg-yellow-300 text-xl font-bold p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-600"
+    >
+      {children}
+    </button>
+  );
+};
 
 export default function EightPuzzle() {
   const [board, setBoard] = useState<Board>([
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 0],
+  ]);
+  const [initialBoard, setInitialBoard] = useState<Board>([
     [1, 2, 3],
     [4, 5, 6],
     [7, 8, 0],
@@ -25,11 +38,9 @@ export default function EightPuzzle() {
   const [isSolved, setIsSolved] = useState<boolean>(false);
   const [animation, setAnimation] = useState<boolean>(false);
   const [animationQueue, setAnimationQueue] = useState<Array<Position>>([]);
-  const [animationSpeed, setAnimationSpeed] = useState<number>(1000);
+  const [animationSpeed, setAnimationSpeed] = useState<number>(100);
 
   const [shuffleMoves, setShuffleMoves] = useState<number>(100);
-
-  const boardRef = useRef<HTMLDivElement>(null);
 
   const incrementTotalMoves = () => setTotalMoves(totalMoves + 1);
 
@@ -98,19 +109,11 @@ export default function EightPuzzle() {
   };
 
   const isSolvedBoard = (board: Board): boolean => {
-    return (
-      JSON.stringify(board) ===
-      JSON.stringify([
-        [1, 2, 3],
-        [4, 5, 6],
-        [7, 8, 0],
-      ])
-    );
+    return JSON.stringify(board) === JSON.stringify(initialBoard);
   };
 
   const solve = (board: Board): Array<Position> => {
     // TODO: Implement a solver
-
     return [];
   };
 
@@ -147,15 +150,14 @@ export default function EightPuzzle() {
       setAnimationQueue(animationQueue.slice(1));
     }, animationSpeed);
     return () => clearTimeout(timeout);
-  }, [animationQueue, animationSpeed, board, totalMoves]);
+  }, [animationQueue]);
+  // }, [animationQueue, animationSpeed, board, totalMoves]);
 
   useEffect(() => {
-    if (isSolvedBoard(board)) {
-      setIsSolved(true);
-    }
+    if (isSolvedBoard(board)) setIsSolved(true);
+    else setIsSolved(false);
   }, [board]);
 
-  // tailwindcss styles
   return (
     <div className="flex flex-col items-center justify-center h-screen">
       <div className="flex flex-col items-center justify-center">
@@ -168,9 +170,9 @@ export default function EightPuzzle() {
                   onClick={() => setBoard(move({ x: i, y: j }, board))}
                   className={`${
                     value === 0
-                      ? "bg-gray-400"
-                      : "bg-gray-200 hover:bg-gray-300"
-                  } text-2xl font-bold p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-600`}
+                      ? "bg-yellow-300"
+                      : "bg-yellow-200 hover:bg-yellow-300"
+                  } text-2xl font-bold px-12 py-8 text-5xl rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-600`}
                 >
                   {value === 0 ? "" : value}
                 </button>
@@ -179,22 +181,17 @@ export default function EightPuzzle() {
           })}
         </div>
         <div className="flex flex-row items-center justify-center mt-2">
-          <button
-            onClick={handleShuffle}
-            className="bg-gray-200 hover:bg-gray-300 text-xl font-bold p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-600"
-          >
-            Shuffle
-          </button>
-          <button
-            onClick={handleSolve}
-            className="bg-gray-200 hover:bg-gray-300 text-xl font-bold p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-600"
-          >
-            Solve
-          </button>
+          <Button onClick={handleShuffle}>Embaralhar</Button>
+          <Button onClick={handleSolve}>Resolver</Button>
+          <Button onClick={() => setBoard(initialBoard)}>Resetar</Button>
         </div>
         <div className="flex flex-row items-center justify-center mt-2">
-          <div className="flex flex-col items-center justify-center">
-            <label htmlFor="animationSpeed">Animation Speed</label>
+          <div className="flex flex-col items-center justify-center text-center">
+            <label htmlFor="animationSpeed">
+              Velocidade da
+              <br />
+              animação
+            </label>
             <input
               id="animationSpeed"
               type="range"
@@ -204,9 +201,14 @@ export default function EightPuzzle() {
               onChange={handleAnimationSpeedChange}
               className="w-32"
             />
+            <span>{animationSpeed}ms</span>
           </div>
-          <div className="flex flex-col items-center justify-center ml-2">
-            <label htmlFor="shuffleMoves">Shuffle Moves</label>
+          <div className="flex flex-col items-center justify-center ml-2 text-center">
+            <label htmlFor="shuffleMoves">
+              Movimentos de
+              <br />
+              embaralhamento
+            </label>
             <input
               id="shuffleMoves"
               type="range"
@@ -216,21 +218,23 @@ export default function EightPuzzle() {
               onChange={handleShuffleMovesChange}
               className="w-32"
             />
+            <span>{shuffleMoves}</span>
           </div>
         </div>
         <div className="flex flex-row items-center justify-center mt-2">
           <div className="flex flex-col items-center justify-center">
-            <label htmlFor="totalMoves">Total Moves</label>
+            <label htmlFor="totalMoves">Total de movimentos</label>
             <input
               id="totalMoves"
               type="number"
               value={totalMoves}
-              className="w-32"
+              className="w-32 text-center"
               readOnly
+              disabled
             />
           </div>
           <div className="flex flex-col items-center justify-center ml-2">
-            <label htmlFor="isSolved">Is Solved</label>
+            <label htmlFor="isSolved">Resolvido</label>
             <input
               id="isSolved"
               type="checkbox"
