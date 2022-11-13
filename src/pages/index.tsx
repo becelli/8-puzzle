@@ -41,7 +41,7 @@ export default function EightPuzzle() {
 
   const move = (position: Position, board: Board): Board => {
     const result: Board = moveHelper(position, board);
-    if (result != board) incrementTotalMoves();
+    if (result.toString() !== board.toString()) incrementTotalMoves();
     return result;
   };
 

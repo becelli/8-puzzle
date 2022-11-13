@@ -14,7 +14,7 @@ const sha1 = (data: string) => {
     )
 
     .digest("hex")
-    .slice(0, 8);
+    .slice(0, 7);
 };
 
 // counter to keep track of if a board was already visited
@@ -36,8 +36,6 @@ export const canMove = (position: Position, board: Board): boolean => {
   const { x: emptyX, y: emptyY } = emptyPosition;
   if (x === emptyX && y === emptyY) return false;
 
-  const hashedBoard = sha1(board.toString());
-  if (alreadyVisitedBoards.includes(hashedBoard)) return false;
   if (x === emptyX && Math.abs(y - emptyY) === 1) return true;
   if (y === emptyY && Math.abs(x - emptyX) === 1) return true;
   return false;
@@ -90,6 +88,10 @@ export const moveHelper = (position: Position, board: Board): Board => {
   newBoard[emptyX][emptyY] = newBoard[x][y];
   newBoard[x][y] = 0;
 
+  const hashedBoard = sha1(newBoard.toString()).slice(0, 7);
+  if (alreadyVisitedBoards.includes(hashedBoard)) return board;
+  else alreadyVisitedBoards.push(hashedBoard);
+
   return newBoard;
 };
 
@@ -99,13 +101,80 @@ export const isBoardSolved = (board: Board): boolean => {
   return board.toString() === initialBoard.toString();
 };
 
+export const boardScoreCityBlock = (board: Board): number => {
+  let score = 0;
+  for (let i = 0; i < board.length; i++) {
+    for (let j = 0; j < board[i].length; j++) {
+      const value = board[i][j];
+      if (value === 0) continue;
+      // sum the city block distance of each tile from its correct position
+      const x = Math.floor((value - 1) / board.length);
+      const y = (value - 1) % board.length;
+      score += Math.abs(x - i) + Math.abs(y - j);
+    }
+  }
+  return score;
+};
+
+export const boardScoreSlow = (board: Board): number => {
+  let score = 0;
+  for (let i = 0; i < board.length; i++) {
+    for (let j = 0; j < board[i].length; j++) {
+      const value = board[i][j];
+
+      score += Math.abs(i + j + 1 - board[i][j]); //i+j+1 is the position that is being analized
+    }
+  }
+  return score;
+};
+
 export const solve = (board: Board): Position[] => {
   const startTime = DateTime.now();
-  // TODO: implement the algorithm to solve the board
-  const solution: Position[] = [];
+  const solution: Position[] = solveDeep1(board);
   const endTime = DateTime.now();
   const duration = endTime.diff(startTime, "milliseconds").toObject();
   console.log(`Solved in ${duration.milliseconds}ms`);
   alreadyVisitedBoards = [];
+  return solution;
+};
+
+export const getPossibleMoves = (board: Board): Position[] => {
+  const emptyPosition: Position = findEmptyPosition(board);
+  const { x, y } = emptyPosition;
+  const possibleMoves: Array<Position> = [
+    { x: x - 1, y },
+    { x: x + 1, y },
+    { x, y: y - 1 },
+    { x, y: y + 1 },
+  ];
+  const possibleMovesFiltered: Array<Position> = filterMoves(
+    possibleMoves,
+    board
+  );
+
+  return possibleMovesFiltered;
+};
+
+export const solveDeep1 = (board: Board): Position[] => {
+  // return the tiles that need to be moved to solve the board
+  const solution: Position[] = [];
+
+  while (!isBoardSolved(board)) {
+    const possibleMoves = getPossibleMoves(board);
+    const bestMove = possibleMoves.reduce(
+      (bestMove, move) => {
+        //find the better score
+        const newBoard = moveHelper(move, board);
+        const score = boardScoreCityBlock(newBoard);
+        if (score < bestMove.score) return { move, score };
+        else return bestMove;
+      },
+      { move: { x: -1, y: -1 }, score: Infinity } //worst case scenario
+    );
+    if (bestMove.move.x === -1) return [];
+    board = moveHelper(bestMove.move, board);
+    solution.push(bestMove.move);
+    console.log(solution.length);
+  }
   return solution;
 };
