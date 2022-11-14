@@ -1,4 +1,4 @@
-import { Board, Position } from "./types";
+import { Board, Position, ScoredPosition, ScoredBoard } from "./types";
 import { DateTime } from "luxon";
 
 import { createHash } from "crypto";
@@ -125,7 +125,7 @@ export const boardScoreSlow = (board: Board): number => {
 export const solve = (board: Board): Position[] => {
   const startTime = DateTime.now();
   alreadyVisitedBoards = [];
-  const solution: Position[] = solvePuzzleOneLayer(board);
+  const solution: Position[] = solvePuzzleTwoLayers(board);
   const endTime = DateTime.now();
   const duration = endTime.diff(startTime, "milliseconds").toObject();
   console.log(`Solved in ${duration.milliseconds}ms`);
@@ -149,41 +149,150 @@ export const getPossibleMoves = (board: Board): Position[] => {
   return possibleMovesFiltered;
 };
 
+export const getBestMovesInOrder = (board: Board): ScoredPosition[] => {
+  const possibleMoves = getPossibleMoves(board);
+    
+  const scoredMoves = possibleMoves.map((position) => {
+    const newBoard = moveHelper(position, board);
+    return {
+      position,
+      score: boardScoreCityBlock(newBoard),
+    };
+  });
+
+  const sortedMoves = scoredMoves.sort((a, b) => a.score - b.score);
+  return sortedMoves;
+}
+
+export const getPossibleBoardsFromCurrent = (board: Board): Board[] => {
+  const possibleMoves = getPossibleMoves(board);
+  const possibleBoards = possibleMoves.map((position) => moveHelper(position, board));
+  return possibleBoards;
+}
+
 export const solvePuzzleOneLayer = (board: Board): Position[] => {
   // return the tiles that need to be moved to solve the board
   const solution: Position[] = [];
 
   while (!isBoardSolved(board)) {
-    const possibleMoves = getPossibleMoves(board);
     
-    const bestMovesInOrder: Position[] = possibleMoves.sort((a, b) => {
-      const newBoardA = moveHelper(a, board);
-      const newBoardB = moveHelper(b, board);
-      const scoreA = boardScoreCityBlock(newBoardA);
-      const scoreB = boardScoreCityBlock(newBoardB);
-      return scoreA - scoreB;
-    });
+    const bestMovesInOrder: ScoredPosition[] = getBestMovesInOrder(board);
     
     let chosenMove = false;
 
     for (let i = 0; i < bestMovesInOrder.length; i++) {
       const move = bestMovesInOrder[i];
-      const newBoard = moveHelper(move, board);
+      const newBoard = moveHelper(move.position, board);
       const hashedBoard = sha1(newBoard.toString()).slice(0, 7);
       if (!alreadyVisitedBoards.includes(hashedBoard)) {
-        solution.push(move);
+        solution.push(move.position);
         board = newBoard;
         alreadyVisitedBoards.push(hashedBoard);
         chosenMove = true;
         break;
       }
     }
+
     if (!chosenMove) {
       const index = Math.floor(Math.random() * bestMovesInOrder.length);
       const randomMove = bestMovesInOrder[index];
-      board = moveHelper(randomMove, board);
-      solution.push(randomMove);
+      board = moveHelper(randomMove.position, board);
+      solution.push(randomMove.position);
     }
   }
   return solution;
 };
+
+export const getPossibleBoardsInOrder = (board: Board): ScoredBoard[] => {
+  const possibleBoards = getPossibleBoardsFromCurrent(board);
+  const scoredBoards = possibleBoards.map((board) => {
+    return {
+      board,
+      score: boardScoreCityBlock(board),
+    };
+  });
+  
+  const sortedBoards = scoredBoards.sort((a, b) => a.score - b.score);
+  return sortedBoards;
+}
+
+type ScoredGrandchildren = {
+  board: Board;
+  score: number;
+  parent: Board;
+}
+
+export const getGrandchildrensInOrder = (childrenBoards: Board[]): ScoredGrandchildren[] => {
+  const grandchildrens: ScoredGrandchildren[] = [];
+  childrenBoards.forEach((board) => {
+    const possibleBoards = getPossibleBoardsFromCurrent(board);
+    possibleBoards.forEach((possibleBoard) => {
+      grandchildrens.push({
+        board: possibleBoard,
+        score: boardScoreCityBlock(possibleBoard),
+        parent: board,
+      });
+    });
+  });
+
+  const sortedGrandchildrens = grandchildrens.sort( (a, b) => a.score - b.score );
+  return sortedGrandchildrens;
+}
+export const getPositionOfMove = (oldBoard: Board, newBoard: Board): Position => {
+  const oldEmptyPosition = findEmptyPosition(oldBoard);
+  const newEmptyPosition = findEmptyPosition(newBoard);
+  const positionOfMove = {
+    x: oldEmptyPosition.x - newEmptyPosition.x,
+    y: oldEmptyPosition.y - newEmptyPosition.y,
+  };
+  return positionOfMove;
+}
+
+
+export const solvePuzzleTwoLayers = (board: Board): Position[] => {
+  const solution: Position[] = [];
+
+  while (!isBoardSolved(board)) {
+    const possibleBoards: Board[] = getPossibleBoardsFromCurrent(board);
+    
+    //child boards that are possible and not repeted
+    const filteredBoards: Board[] = possibleBoards.filter((board) => {
+      const hashedBoard = sha1(board.toString()).slice(0, 7);
+      return !alreadyVisitedBoards.includes(hashedBoard);
+    });
+
+
+
+    if (filteredBoards.length !== 0) {
+      const grandchildrensInOrder: ScoredGrandchildren[] = getGrandchildrensInOrder(filteredBoards);
+      
+      let chosenMove = false;
+      
+      for(let i = 0; i < grandchildrensInOrder.length; i++) {
+        const grandchildren = grandchildrensInOrder[i];
+        const hashedBoard = sha1(grandchildren.board.toString()).slice(0, 7);
+        if (!alreadyVisitedBoards.includes(hashedBoard)) {
+          solution.push(getPositionOfMove(board, grandchildren.parent));
+          board = grandchildren.parent;
+          const hashedBoard = sha1(board.toString()).slice(0, 7);
+          alreadyVisitedBoards.push(hashedBoard);
+          chosenMove = true;
+          break;
+        }
+      }
+      
+      if (!chosenMove) {
+        const index = Math.floor(Math.random() * filteredBoards.length);
+        const randomBoard = filteredBoards[index];
+        solution.push(getPositionOfMove(board, randomBoard));
+        board = randomBoard;
+      }
+    } else {
+      const randomIndex = Math.floor(Math.random() * possibleBoards.length);
+      const randomBoard = possibleBoards[randomIndex];
+      solution.push(getPositionOfMove(board, randomBoard));
+      board = randomBoard;
+    }
+  }
+  return solution;
+}
