@@ -146,7 +146,7 @@ export default function EightPuzzle() {
               id="shuffleMoves"
               type="range"
               min="0"
-              max="100"
+              max="1000"
               value={shuffleMoves}
               onChange={handleShuffleMovesChange}
               className="w-32"

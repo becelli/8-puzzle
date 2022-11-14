@@ -88,10 +88,6 @@ export const moveHelper = (position: Position, board: Board): Board => {
   newBoard[emptyX][emptyY] = newBoard[x][y];
   newBoard[x][y] = 0;
 
-  const hashedBoard = sha1(newBoard.toString()).slice(0, 7);
-  if (alreadyVisitedBoards.includes(hashedBoard)) return board;
-  else alreadyVisitedBoards.push(hashedBoard);
-
   return newBoard;
 };
 
@@ -120,8 +116,6 @@ export const boardScoreSlow = (board: Board): number => {
   let score = 0;
   for (let i = 0; i < board.length; i++) {
     for (let j = 0; j < board[i].length; j++) {
-      const value = board[i][j];
-
       score += Math.abs(i + j + 1 - board[i][j]); //i+j+1 is the position that is being analized
     }
   }
@@ -130,11 +124,11 @@ export const boardScoreSlow = (board: Board): number => {
 
 export const solve = (board: Board): Position[] => {
   const startTime = DateTime.now();
-  const solution: Position[] = solveDeep1(board);
+  alreadyVisitedBoards = [];
+  const solution: Position[] = solvePuzzleOneLayer(board);
   const endTime = DateTime.now();
   const duration = endTime.diff(startTime, "milliseconds").toObject();
   console.log(`Solved in ${duration.milliseconds}ms`);
-  alreadyVisitedBoards = [];
   return solution;
 };
 
@@ -155,26 +149,41 @@ export const getPossibleMoves = (board: Board): Position[] => {
   return possibleMovesFiltered;
 };
 
-export const solveDeep1 = (board: Board): Position[] => {
+export const solvePuzzleOneLayer = (board: Board): Position[] => {
   // return the tiles that need to be moved to solve the board
   const solution: Position[] = [];
 
   while (!isBoardSolved(board)) {
     const possibleMoves = getPossibleMoves(board);
-    const bestMove = possibleMoves.reduce(
-      (bestMove, move) => {
-        //find the better score
-        const newBoard = moveHelper(move, board);
-        const score = boardScoreCityBlock(newBoard);
-        if (score < bestMove.score) return { move, score };
-        else return bestMove;
-      },
-      { move: { x: -1, y: -1 }, score: Infinity } //worst case scenario
-    );
-    if (bestMove.move.x === -1) return [];
-    board = moveHelper(bestMove.move, board);
-    solution.push(bestMove.move);
-    console.log(solution.length);
+    
+    const bestMovesInOrder: Position[] = possibleMoves.sort((a, b) => {
+      const newBoardA = moveHelper(a, board);
+      const newBoardB = moveHelper(b, board);
+      const scoreA = boardScoreCityBlock(newBoardA);
+      const scoreB = boardScoreCityBlock(newBoardB);
+      return scoreA - scoreB;
+    });
+    
+    let chosenMove = false;
+
+    for (let i = 0; i < bestMovesInOrder.length; i++) {
+      const move = bestMovesInOrder[i];
+      const newBoard = moveHelper(move, board);
+      const hashedBoard = sha1(newBoard.toString()).slice(0, 7);
+      if (!alreadyVisitedBoards.includes(hashedBoard)) {
+        solution.push(move);
+        board = newBoard;
+        alreadyVisitedBoards.push(hashedBoard);
+        chosenMove = true;
+        break;
+      }
+    }
+    if (!chosenMove) {
+      const index = Math.floor(Math.random() * bestMovesInOrder.length);
+      const randomMove = bestMovesInOrder[index];
+      board = moveHelper(randomMove, board);
+      solution.push(randomMove);
+    }
   }
   return solution;
 };
