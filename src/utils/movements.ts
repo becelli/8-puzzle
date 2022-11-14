@@ -125,6 +125,7 @@ export const boardScoreSlow = (board: Board): number => {
 export const solve = (board: Board): Position[] => {
   const startTime = DateTime.now();
   alreadyVisitedBoards = [];
+  // const solution: Position[] = solvePuzzleOneLayer(board);
   const solution: Position[] = solvePuzzleTwoLayers(board);
   const endTime = DateTime.now();
   const duration = endTime.diff(startTime, "milliseconds").toObject();
@@ -238,15 +239,6 @@ export const getGrandchildrensInOrder = (childrenBoards: Board[]): ScoredGrandch
   const sortedGrandchildrens = grandchildrens.sort( (a, b) => a.score - b.score );
   return sortedGrandchildrens;
 }
-export const getPositionOfMove = (oldBoard: Board, newBoard: Board): Position => {
-  const oldEmptyPosition = findEmptyPosition(oldBoard);
-  const newEmptyPosition = findEmptyPosition(newBoard);
-  const positionOfMove = {
-    x: oldEmptyPosition.x - newEmptyPosition.x,
-    y: oldEmptyPosition.y - newEmptyPosition.y,
-  };
-  return positionOfMove;
-}
 
 
 export const solvePuzzleTwoLayers = (board: Board): Position[] => {
@@ -261,6 +253,17 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
       return !alreadyVisitedBoards.includes(hashedBoard);
     });
 
+    // Verify if children boards are solved
+    for(let i = 0; i < filteredBoards.length; i++) {
+      const childBoard = filteredBoards[i];
+      if (isBoardSolved(childBoard)) {
+        const hashedBoard = sha1(childBoard.toString()).slice(0, 7);
+        alreadyVisitedBoards.push(hashedBoard);
+        const move = getTileMoved(board, childBoard);
+        solution.push(move);
+        return solution;
+      }
+    }
 
 
     if (filteredBoards.length !== 0) {
@@ -272,7 +275,7 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
         const grandchildren = grandchildrensInOrder[i];
         const hashedBoard = sha1(grandchildren.board.toString()).slice(0, 7);
         if (!alreadyVisitedBoards.includes(hashedBoard)) {
-          solution.push(getPositionOfMove(board, grandchildren.parent));
+          solution.push(getTileMoved(board, grandchildren.parent));
           board = grandchildren.parent;
           const hashedBoard = sha1(board.toString()).slice(0, 7);
           alreadyVisitedBoards.push(hashedBoard);
@@ -284,15 +287,26 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
       if (!chosenMove) {
         const index = Math.floor(Math.random() * filteredBoards.length);
         const randomBoard = filteredBoards[index];
-        solution.push(getPositionOfMove(board, randomBoard));
+        solution.push(getTileMoved(board, randomBoard));
         board = randomBoard;
       }
     } else {
       const randomIndex = Math.floor(Math.random() * possibleBoards.length);
       const randomBoard = possibleBoards[randomIndex];
-      solution.push(getPositionOfMove(board, randomBoard));
+      solution.push(getTileMoved(board, randomBoard));
       board = randomBoard;
     }
   }
   return solution;
 }
+
+export const getTileMoved = (board: Board, newBoard: Board): Position => {
+  const possibleMoves = getPossibleMoves(board);
+  let tileMoved: Position = { x: 0, y: 0 };
+  possibleMoves.forEach((move) => {
+    if (moveHelper(move, board).toString() === newBoard.toString()) {
+      tileMoved = move;
+    }
+  });
+  return tileMoved;
+};
