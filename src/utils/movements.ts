@@ -122,14 +122,21 @@ export const boardScoreSlow = (board: Board): number => {
   return score;
 };
 
-export const solve = (board: Board): Position[] => {
-  const startTime = DateTime.now();
+export const solveGreedy = (board: Board): Position[] => {
   alreadyVisitedBoards = [];
-  // const solution: Position[] = solvePuzzleOneLayer(board);
+  const solution: Position[] = solvePuzzleOneLayer(board);
+  return solution;
+};
+
+export const solveAStar = (board: Board): Position[] => {
+  alreadyVisitedBoards = [];
   const solution: Position[] = solvePuzzleTwoLayers(board);
-  const endTime = DateTime.now();
-  const duration = endTime.diff(startTime, "milliseconds").toObject();
-  console.log(`Solved in ${duration.milliseconds}ms`);
+  return solution;
+};
+
+export const solveCustom = (board: Board): Position[] => {
+  alreadyVisitedBoards = [];
+  const solution: Position[] = solvePuzzleOneLayer(board);
   return solution;
 };
 
@@ -152,7 +159,7 @@ export const getPossibleMoves = (board: Board): Position[] => {
 
 export const getBestMovesInOrder = (board: Board): ScoredPosition[] => {
   const possibleMoves = getPossibleMoves(board);
-    
+
   const scoredMoves = possibleMoves.map((position) => {
     const newBoard = moveHelper(position, board);
     return {
@@ -163,22 +170,23 @@ export const getBestMovesInOrder = (board: Board): ScoredPosition[] => {
 
   const sortedMoves = scoredMoves.sort((a, b) => a.score - b.score);
   return sortedMoves;
-}
+};
 
 export const getPossibleBoardsFromCurrent = (board: Board): Board[] => {
   const possibleMoves = getPossibleMoves(board);
-  const possibleBoards = possibleMoves.map((position) => moveHelper(position, board));
+  const possibleBoards = possibleMoves.map((position) =>
+    moveHelper(position, board)
+  );
   return possibleBoards;
-}
+};
 
 export const solvePuzzleOneLayer = (board: Board): Position[] => {
   // return the tiles that need to be moved to solve the board
   const solution: Position[] = [];
 
   while (!isBoardSolved(board)) {
-    
     const bestMovesInOrder: ScoredPosition[] = getBestMovesInOrder(board);
-    
+
     let chosenMove = false;
 
     for (let i = 0; i < bestMovesInOrder.length; i++) {
@@ -212,18 +220,20 @@ export const getPossibleBoardsInOrder = (board: Board): ScoredBoard[] => {
       score: boardScoreCityBlock(board),
     };
   });
-  
+
   const sortedBoards = scoredBoards.sort((a, b) => a.score - b.score);
   return sortedBoards;
-}
+};
 
 type ScoredGrandchildren = {
   board: Board;
   score: number;
   parent: Board;
-}
+};
 
-export const getGrandchildrensInOrder = (childrenBoards: Board[]): ScoredGrandchildren[] => {
+export const getGrandchildrensInOrder = (
+  childrenBoards: Board[]
+): ScoredGrandchildren[] => {
   const grandchildrens: ScoredGrandchildren[] = [];
   childrenBoards.forEach((board) => {
     const possibleBoards = getPossibleBoardsFromCurrent(board);
@@ -236,17 +246,16 @@ export const getGrandchildrensInOrder = (childrenBoards: Board[]): ScoredGrandch
     });
   });
 
-  const sortedGrandchildrens = grandchildrens.sort( (a, b) => a.score - b.score );
+  const sortedGrandchildrens = grandchildrens.sort((a, b) => a.score - b.score);
   return sortedGrandchildrens;
-}
-
+};
 
 export const solvePuzzleTwoLayers = (board: Board): Position[] => {
   const solution: Position[] = [];
 
   while (!isBoardSolved(board)) {
     const possibleBoards: Board[] = getPossibleBoardsFromCurrent(board);
-    
+
     //child boards that are possible and not repeted
     const filteredBoards: Board[] = possibleBoards.filter((board) => {
       const hashedBoard = sha1(board.toString()).slice(0, 7);
@@ -254,7 +263,7 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
     });
 
     // Verify if children boards are solved
-    for(let i = 0; i < filteredBoards.length; i++) {
+    for (let i = 0; i < filteredBoards.length; i++) {
       const childBoard = filteredBoards[i];
       if (isBoardSolved(childBoard)) {
         const hashedBoard = sha1(childBoard.toString()).slice(0, 7);
@@ -265,13 +274,13 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
       }
     }
 
-
     if (filteredBoards.length !== 0) {
-      const grandchildrensInOrder: ScoredGrandchildren[] = getGrandchildrensInOrder(filteredBoards);
-      
+      const grandchildrensInOrder: ScoredGrandchildren[] =
+        getGrandchildrensInOrder(filteredBoards);
+
       let chosenMove = false;
-      
-      for(let i = 0; i < grandchildrensInOrder.length; i++) {
+
+      for (let i = 0; i < grandchildrensInOrder.length; i++) {
         const grandchildren = grandchildrensInOrder[i];
         const hashedBoard = sha1(grandchildren.board.toString()).slice(0, 7);
         if (!alreadyVisitedBoards.includes(hashedBoard)) {
@@ -283,7 +292,7 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
           break;
         }
       }
-      
+
       if (!chosenMove) {
         const index = Math.floor(Math.random() * filteredBoards.length);
         const randomBoard = filteredBoards[index];
@@ -298,7 +307,7 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
     }
   }
   return solution;
-}
+};
 
 export const getTileMoved = (board: Board, newBoard: Board): Position => {
   const possibleMoves = getPossibleMoves(board);

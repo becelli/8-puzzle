@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { generateInitialBoard } from "../utils/board";
 import { Board, Position } from "../utils/types";
+import { solveAStar, solveCustom, solveGreedy } from "../utils/movements";
 import {
   canMove,
   findEmptyPosition,
   moveHelper,
   shuffle,
-  solve,
   isBoardSolved,
 } from "../utils/movements";
+import Image from "next/image";
 
 const Button = ({
   onClick,
@@ -20,7 +21,7 @@ const Button = ({
   return (
     <button
       onClick={onClick}
-      className={`mx-1 text-xl font-bold p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-600 bg-violet-200 hover:bg-violet-300`}
+      className={`mx-1 text-xl font-medium p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600 bg-amber-500 hover:bg-amber-600`}
     >
       {children}
     </button>
@@ -30,7 +31,10 @@ const Button = ({
 export default function EightPuzzle() {
   const [boardSize, setBoardSize] = useState<number>(3);
   const [board, setBoard] = useState<Board>(generateInitialBoard(boardSize));
-
+  const [savedBoard, setSavedBoard] = useState<Board>(
+    generateInitialBoard(boardSize)
+  );
+  const [savedBoardMoves, setSavedBoardMoves] = useState<number>(0);
   const [totalMoves, setTotalMoves] = useState<number>(0);
   const [isSolved, setIsSolved] = useState<boolean>(false);
   const [animationQueue, setAnimationQueue] = useState<Array<Position>>([]);
@@ -50,8 +54,18 @@ export default function EightPuzzle() {
     setTotalMoves(0);
   };
 
-  const handleSolve = () => {
-    const solution: Array<Position> = solve(board);
+  const handleSolveGreedy = () => {
+    const solution: Array<Position> = solveGreedy(board);
+    setAnimationQueue(solution);
+  };
+
+  const handleSolveAStar = () => {
+    const solution: Array<Position> = solveAStar(board);
+    setAnimationQueue(solution);
+  };
+
+  const handleSolveCustom = () => {
+    const solution: Array<Position> = solveCustom(board);
     setAnimationQueue(solution);
   };
 
@@ -63,6 +77,16 @@ export default function EightPuzzle() {
     const initialBoard = generateInitialBoard(boardSize);
     setBoard(initialBoard);
     setTotalMoves(0);
+  };
+
+  const handleSave = () => {
+    setSavedBoard(board);
+    setSavedBoardMoves(totalMoves);
+  };
+
+  const handleLoad = () => {
+    setBoard(savedBoard);
+    setTotalMoves(savedBoardMoves);
   };
 
   const handleAnimationSpeedChange = (
@@ -92,7 +116,7 @@ export default function EightPuzzle() {
   }, [board]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
+    <div className="flex flex-col items-center justify-center h-screen text-white">
       <div className="flex flex-col items-center justify-center">
         <div className={`grid gap-1 grid-cols-${boardSize}`}>
           {board.map((row, i) => {
@@ -103,9 +127,9 @@ export default function EightPuzzle() {
                   onClick={() => handleMove({ x: i, y: j })}
                   className={`${
                     value === 0
-                      ? "bg-violet-300"
-                      : "bg-violet-200 hover:bg-violet-300"
-                  }  font-bold px-12 py-8 text-4xl rounded-md focus:outline-none focus:ring-2 focus:ring-violet-600`}
+                      ? "bg-amber-600"
+                      : "bg-amber-500 hover:bg-amber-600"
+                  }  font-medium px-12 py-8 text-4xl rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600`}
                 >
                   {value === 0 ? "" : value}
                 </button>
@@ -113,10 +137,21 @@ export default function EightPuzzle() {
             });
           })}
         </div>
-        <div className="flex flex-row items-center justify-center mt-2">
-          <Button onClick={handleShuffle}>Embaralhar</Button>
-          <Button onClick={handleSolve}>Resolver</Button>
-          <Button onClick={handleReset}>Resetar</Button>
+        <div className="flex flex-col">
+          <div className="flex flex-row items-center justify-center mt-2">
+            <Button onClick={handleShuffle}>Shuffle</Button>
+            <Button onClick={handleReset}>Restart</Button>
+          </div>
+          <div className="flex flex-row items-center justify-center mt-2">
+            <Button onClick={handleSave}>Save board</Button>
+            <Button onClick={handleLoad}>Load save</Button>
+          </div>
+          <h1 className="text-xl font-bold text-center">Solving techniques</h1>
+          <div className="flex items-center justify-center mt-2 flex-fow">
+            <Button onClick={handleSolveGreedy}>Greedy</Button>
+            <Button onClick={handleSolveAStar}>A*</Button>
+            <Button onClick={handleSolveCustom}>Pessoal</Button>
+          </div>
         </div>
         <div className="flex flex-row items-center justify-center mt-2">
           <div className="flex flex-col items-center justify-center text-center">
@@ -157,14 +192,7 @@ export default function EightPuzzle() {
         <div className="flex flex-row items-center justify-center mt-2">
           <div className="flex flex-col items-center justify-center">
             <label htmlFor="totalMoves">Total de movimentos</label>
-            <input
-              id="totalMoves"
-              type="number"
-              value={totalMoves}
-              className="w-32 text-center"
-              readOnly
-              disabled
-            />
+            <h1>{totalMoves}</h1>
           </div>
           <div className="flex flex-col items-center justify-center ml-2">
             <label htmlFor="isSolved">Resolvido</label>
@@ -177,6 +205,20 @@ export default function EightPuzzle() {
             />
           </div>
         </div>
+      </div>
+      <div className="absolute w-full h-full bg-black -z-10 blur-xl">
+        <Image
+          src="/rick-roll.gif"
+          {...{
+            fill: true,
+            style: {
+              objectFit: "cover",
+              objectPosition: "center",
+              opacity: "60%",
+            },
+          }}
+          alt="Rick Roll"
+        />
       </div>
     </div>
   );
