@@ -1,29 +1,26 @@
-import { Board, Position, ScoredPosition, ScoredBoard } from "./types";
-import { DateTime } from "luxon";
+import { Board, Position, ScoredBoard, ScoredPosition } from './types';
+import { DateTime } from 'luxon';
+const alreadyVisitedBoards = new Set();
+import { createHash } from 'crypto';
+type Hash = string;
+const getBoardHash = (board: Board) => {
+  return createHash('md5').update(board.toString()).digest('hex').slice(0, 10);
+};
 
-import { createHash } from "crypto";
+const addBoardToVisited = (boardHash: Hash): void => {
+  alreadyVisitedBoards.add(boardHash);
+};
 
-const sha1 = (data: string) => {
-  return createHash("sha1")
-    .update(
-      data
-        .split("")
-        .map((c) => c.charCodeAt(0))
-        .map((c) => c.toString(16))
-        .join("")
-    )
-
-    .digest("hex")
-    .slice(0, 7);
+const wasBoardVisited = (boardHash: Hash): boolean => {
+  return alreadyVisitedBoards.has(boardHash);
 };
 
 // counter to keep track of if a board was already visited
-let alreadyVisitedBoards: Array<string> = [];
 
 export const generateInitialBoard = (N: number): Board => {
-  const board: Board = Array.from({ length: N }, (_, i) =>
-    Array.from({ length: N }, (_, j) => i * N + j + 1)
-  ).map((row, i) => (i === N - 1 ? row.slice(0, -1).concat(0) : row));
+  const board: Board = Array.from({ length: N }, (_, i) => Array.from({ length: N }, (_, j) => i * N + j + 1)).map(
+    (row, i) => (i === N - 1 ? row.slice(0, -1).concat(0) : row),
+  );
   return board;
 };
 
@@ -67,13 +64,8 @@ export const shuffle = (board: Board, moves: number): Board => {
       { x, y: y - 1 },
       { x, y: y + 1 },
     ];
-    const possibleMovesFiltered: Array<Position> = filterMoves(
-      possibleMoves,
-      newBoard
-    );
-    const randomIndex: number = Math.floor(
-      Math.random() * possibleMovesFiltered.length
-    );
+    const possibleMovesFiltered: Array<Position> = filterMoves(possibleMoves, newBoard);
+    const randomIndex: number = Math.floor(Math.random() * possibleMovesFiltered.length);
     newBoard = moveHelper(possibleMovesFiltered[randomIndex], newBoard);
   }
   return newBoard;
@@ -112,31 +104,45 @@ export const boardScoreCityBlock = (board: Board): number => {
   return score;
 };
 
-export const boardScoreSlow = (board: Board): number => {
-  let score = 0;
-  for (let i = 0; i < board.length; i++) {
-    for (let j = 0; j < board[i].length; j++) {
-      score += Math.abs(i + j + 1 - board[i][j]); //i+j+1 is the position that is being analized
-    }
-  }
-  return score;
-};
-
-export const solveGreedy = (board: Board): Position[] => {
-  alreadyVisitedBoards = [];
-  const solution: Position[] = solvePuzzleOneLayer(board);
+export const solveGreedyOneLayer = (board: Board): Position[] => {
+  alreadyVisitedBoards.clear();
+  const startTime = DateTime.now();
+  const solution: Position[] = solvePuzzleGreedy(board);
+  const endTime = DateTime.now();
+  const duration = endTime.diff(startTime, 'milliseconds').toObject().milliseconds;
+  console.table({
+    'Total Moves': solution.length,
+    'Total Time (miliseconds)': duration,
+  });
   return solution;
 };
 
-export const solveAStar = (board: Board): Position[] => {
-  alreadyVisitedBoards = [];
-  const solution: Position[] = solvePuzzleTwoLayers(board);
+export const solveGreedyTwoLayer = (board: Board): Position[] => {
+  alreadyVisitedBoards.clear();
+
+  const startTime = DateTime.now();
+  const solution: Position[] = solvePuzzleGreedyGrandson(board);
+  const endTime = DateTime.now();
+  const duration = endTime.diff(startTime, 'milliseconds').toObject().milliseconds;
+  console.table({
+    'Total Moves': solution.length,
+    'Total Time (miliseconds)': duration,
+  });
   return solution;
 };
 
 export const solveCustom = (board: Board): Position[] => {
-  alreadyVisitedBoards = [];
-  const solution: Position[] = solvePuzzleOneLayer(board);
+  alreadyVisitedBoards.clear();
+
+  const startTime = DateTime.now();
+  const solution: Position[] = solvePuzzleCustom(board);
+  const endTime = DateTime.now();
+  const duration = endTime.diff(startTime, 'milliseconds').toObject().milliseconds;
+  console.table({
+    'Total Moves': solution.length,
+    'Total Time (miliseconds)': duration,
+  });
+
   return solution;
 };
 
@@ -149,10 +155,7 @@ export const getPossibleMoves = (board: Board): Position[] => {
     { x, y: y - 1 },
     { x, y: y + 1 },
   ];
-  const possibleMovesFiltered: Array<Position> = filterMoves(
-    possibleMoves,
-    board
-  );
+  const possibleMovesFiltered: Array<Position> = filterMoves(possibleMoves, board);
 
   return possibleMovesFiltered;
 };
@@ -174,13 +177,12 @@ export const getBestMovesInOrder = (board: Board): ScoredPosition[] => {
 
 export const getPossibleBoardsFromCurrent = (board: Board): Board[] => {
   const possibleMoves = getPossibleMoves(board);
-  const possibleBoards = possibleMoves.map((position) =>
-    moveHelper(position, board)
-  );
+  const possibleBoards = possibleMoves.map((position) => moveHelper(position, board));
+
   return possibleBoards;
 };
 
-export const solvePuzzleOneLayer = (board: Board): Position[] => {
+export const solvePuzzleGreedy = (board: Board): Position[] => {
   // return the tiles that need to be moved to solve the board
   const solution: Position[] = [];
 
@@ -192,11 +194,11 @@ export const solvePuzzleOneLayer = (board: Board): Position[] => {
     for (let i = 0; i < bestMovesInOrder.length; i++) {
       const move = bestMovesInOrder[i];
       const newBoard = moveHelper(move.position, board);
-      const hashedBoard = sha1(newBoard.toString()).slice(0, 7);
-      if (!alreadyVisitedBoards.includes(hashedBoard)) {
+      const hashedBoard = getBoardHash(newBoard);
+      if (!wasBoardVisited(hashedBoard)) {
         solution.push(move.position);
         board = newBoard;
-        alreadyVisitedBoards.push(hashedBoard);
+        addBoardToVisited(hashedBoard);
         chosenMove = true;
         break;
       }
@@ -212,7 +214,7 @@ export const solvePuzzleOneLayer = (board: Board): Position[] => {
   return solution;
 };
 
-export const getPossibleBoardsInOrder = (board: Board): ScoredBoard[] => {
+export const getPossibleBoardsInOrder = (board: Board, reverse: boolean = false) => {
   const possibleBoards = getPossibleBoardsFromCurrent(board);
   const scoredBoards = possibleBoards.map((board) => {
     return {
@@ -221,7 +223,7 @@ export const getPossibleBoardsInOrder = (board: Board): ScoredBoard[] => {
     };
   });
 
-  const sortedBoards = scoredBoards.sort((a, b) => a.score - b.score);
+  const sortedBoards = scoredBoards.sort((a, b) => (reverse ? b.score - a.score : a.score - b.score));
   return sortedBoards;
 };
 
@@ -231,9 +233,7 @@ type ScoredGrandchildren = {
   parent: Board;
 };
 
-export const getGrandchildrensInOrder = (
-  childrenBoards: Board[]
-): ScoredGrandchildren[] => {
+export const getGrandchildrensInOrder = (childrenBoards: Board[]): ScoredGrandchildren[] => {
   const grandchildrens: ScoredGrandchildren[] = [];
   childrenBoards.forEach((board) => {
     const possibleBoards = getPossibleBoardsFromCurrent(board);
@@ -250,24 +250,24 @@ export const getGrandchildrensInOrder = (
   return sortedGrandchildrens;
 };
 
-export const solvePuzzleTwoLayers = (board: Board): Position[] => {
+export const solvePuzzleGreedyGrandson = (board: Board): Position[] => {
   const solution: Position[] = [];
 
   while (!isBoardSolved(board)) {
     const possibleBoards: Board[] = getPossibleBoardsFromCurrent(board);
 
-    //child boards that are possible and not repeted
+    //child boards that are possible and not repeated
     const filteredBoards: Board[] = possibleBoards.filter((board) => {
-      const hashedBoard = sha1(board.toString()).slice(0, 7);
-      return !alreadyVisitedBoards.includes(hashedBoard);
+      const hashedBoard = getBoardHash(board);
+      return !wasBoardVisited(hashedBoard);
     });
 
     // Verify if children boards are solved
     for (let i = 0; i < filteredBoards.length; i++) {
       const childBoard = filteredBoards[i];
       if (isBoardSolved(childBoard)) {
-        const hashedBoard = sha1(childBoard.toString()).slice(0, 7);
-        alreadyVisitedBoards.push(hashedBoard);
+        const hashedBoard = getBoardHash(childBoard);
+        addBoardToVisited(hashedBoard);
         const move = getTileMoved(board, childBoard);
         solution.push(move);
         return solution;
@@ -275,19 +275,18 @@ export const solvePuzzleTwoLayers = (board: Board): Position[] => {
     }
 
     if (filteredBoards.length !== 0) {
-      const grandchildrensInOrder: ScoredGrandchildren[] =
-        getGrandchildrensInOrder(filteredBoards);
+      const grandchildrensInOrder: ScoredGrandchildren[] = getGrandchildrensInOrder(filteredBoards);
 
       let chosenMove = false;
 
       for (let i = 0; i < grandchildrensInOrder.length; i++) {
         const grandchildren = grandchildrensInOrder[i];
-        const hashedBoard = sha1(grandchildren.board.toString()).slice(0, 7);
-        if (!alreadyVisitedBoards.includes(hashedBoard)) {
+        const hashedBoard = getBoardHash(grandchildren.board);
+        if (!wasBoardVisited(hashedBoard)) {
           solution.push(getTileMoved(board, grandchildren.parent));
           board = grandchildren.parent;
-          const hashedBoard = sha1(board.toString()).slice(0, 7);
-          alreadyVisitedBoards.push(hashedBoard);
+          const hashedBoard = getBoardHash(board);
+          addBoardToVisited(hashedBoard);
           chosenMove = true;
           break;
         }
@@ -318,4 +317,79 @@ export const getTileMoved = (board: Board, newBoard: Board): Position => {
     }
   });
   return tileMoved;
+};
+
+export const solvePuzzleCustom = (board: Board): Position[] => {
+  const solution: Position[] = [];
+
+  while (!isBoardSolved(board)) {
+    const possibleBoards: Board[] = getPossibleBoardsFromCurrent(board);
+
+    //child boards that are possible and not repeated
+    const filteredBoards: Board[] = possibleBoards.filter((board) => {
+      const hashedBoard = getBoardHash(board);
+      return !wasBoardVisited(hashedBoard);
+    });
+
+    // Verify if children boards are solved
+    for (let i = 0; i < filteredBoards.length; i++) {
+      const childBoard = filteredBoards[i];
+      if (isBoardSolved(childBoard)) {
+        const hashedBoard = getBoardHash(childBoard);
+        addBoardToVisited(hashedBoard);
+        const move = getTileMoved(board, childBoard);
+        solution.push(move);
+        return solution;
+      }
+    }
+
+    if (filteredBoards.length !== 0) {
+      const childrenScores: ScoredBoard[] = filteredBoards.map((childBoard) => {
+        const meanScore = getChildMeanScore(childBoard);
+        return {
+          board: childBoard,
+          score: meanScore,
+        };
+      });
+
+      let chosenMove = false;
+
+      //get best least avarege score
+      const childrenScoresInOrder = childrenScores.sort((a, b) => a.score - b.score);
+
+      for (let i = 0; i < childrenScoresInOrder.length; i++) {
+        const childScore = childrenScoresInOrder[i];
+        const hashedBoard = getBoardHash(childScore.board);
+        if (!wasBoardVisited(hashedBoard)) {
+          solution.push(getTileMoved(board, childScore.board));
+          board = childScore.board;
+          const hashedBoard = getBoardHash(board);
+          addBoardToVisited(hashedBoard);
+          chosenMove = true;
+          break;
+        }
+      }
+
+      if (!chosenMove) {
+        const index = Math.floor(Math.random() * filteredBoards.length);
+        const randomBoard = filteredBoards[index];
+        const tileMoved = getTileMoved(board, randomBoard);
+        solution.push(tileMoved);
+        board = randomBoard;
+      }
+    } else {
+      const randomIndex = Math.floor(Math.random() * possibleBoards.length);
+      const randomBoard = possibleBoards[randomIndex];
+      const tileMoved = getTileMoved(board, randomBoard);
+      solution.push(tileMoved);
+      board = randomBoard;
+    }
+  }
+  return solution;
+};
+
+const getChildMeanScore = (childBoard: Board): number => {
+  const childrens = getPossibleBoardsFromCurrent(childBoard);
+  const meanScore = childrens.reduce((acc, curr) => acc + boardScoreCityBlock(curr), 0) / childrens.length;
+  return meanScore;
 };
