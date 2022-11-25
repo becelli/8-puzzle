@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { generateInitialBoard } from '../utils/board';
 import { Board, Position } from '../utils/types';
 import { solveGreedyTwoLayer, solveCustom, solveGreedyOneLayer } from '../utils/movements';
-import { canMove, findEmptyPosition, moveHelper, shuffle, isBoardSolved } from '../utils/movements';
+import { moveHelper, shuffle, isBoardSolved } from '../utils/movements';
 import Image from 'next/image';
 
 const Button = ({ onClick, children }: { onClick: () => void; children: any }) => {
