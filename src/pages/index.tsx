@@ -1,25 +1,30 @@
 import { useState, useEffect } from 'react';
-import { generateInitialBoard } from '../utils/board';
+import { generateInitialBoard, generateCustomBoard } from '../utils/board';
 import { Board, Position } from '../utils/types';
 import { solveGreedyTwoLayer, solveCustom, solveGreedyOneLayer } from '../utils/movements';
 import { moveHelper, shuffle, isBoardSolved } from '../utils/movements';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
+import { encode } from 'js-base64';
 
-const Button = ({ onClick, children }: { onClick: () => void; children: any }) => {
+const Button = ({ onClick, theme, children }: { onClick: () => void; children: any; theme: ColorPalette }) => {
   return (
     <button
       onClick={onClick}
-      className={`mx-1 text-xl font-medium p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600 bg-amber-500 hover:bg-amber-600`}
+      className={`mx-1 text-lg font-medium px-2 py-2 m-1 rounded-md focus:outline-none focus:ring-2 ${theme.focusBg600} ${theme.bg500} ${theme.hoverBg600}`}
     >
       {children}
     </button>
   );
 };
 
-export default function EightPuzzle() {
+export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
+  const router = useRouter();
+  const initial = generateCustomBoard(router.query.game as string);
+
   const [personalActivated, setPersonalActivated] = useState(false);
-  const [boardSize, setBoardSize] = useState<number>(3);
-  const [board, setBoard] = useState<Board>(generateInitialBoard(boardSize));
+  const [boardSize, setBoardSize] = useState<number>(initial.length);
+  const [board, setBoard] = useState<Board>(initial);
   const [savedBoard, setSavedBoard] = useState<Board>(generateInitialBoard(boardSize));
   const [savedBoardMoves, setSavedBoardMoves] = useState<number>(0);
   const [totalMoves, setTotalMoves] = useState<number>(0);
@@ -38,16 +43,19 @@ export default function EightPuzzle() {
 
   const handleShuffle = () => {
     setBoard(shuffle(board, shuffleMoves));
+
     setTotalMoves(0);
   };
 
-  const handleSolveGreedy = () => {
+  const handleSolveGreedySon = () => {
     const solution: Array<Position> = solveGreedyOneLayer(board);
+
     setAnimationQueue(solution);
   };
 
-  const handleSolveAStar = () => {
+  const handleSolveGreedyGranchildren = () => {
     const solution: Array<Position> = solveGreedyTwoLayer(board);
+
     setAnimationQueue(solution);
   };
 
@@ -64,6 +72,7 @@ export default function EightPuzzle() {
   const handleReset = () => {
     const initialBoard = generateInitialBoard(boardSize);
     setBoard(initialBoard);
+    setPersonalActivated(false);
     setTotalMoves(0);
   };
 
@@ -105,15 +114,29 @@ export default function EightPuzzle() {
   useEffect(() => {
     if (isBoardSolved(board)) setIsSolved(true);
     else setIsSolved(false);
+
+    if (animationQueue.length === 0) {
+      const game = encode(board.toString());
+      router.replace({ query: { game } }, undefined, { shallow: true });
+    }
   }, [board]);
+
+  const tileColor = (value: number) =>
+    value === 0 ? `${theme.bg600}` : `${theme.bg500}  ${theme.hoverBg600} ${theme.focusBg600}`;
+
+  const tileSize = () => {
+    if (boardSize === 3) return 'px-12 py-9';
+    if (boardSize === 4) return 'px-7 py-5 sm:px-12 sm:py-9';
+    if (boardSize === 5) return 'px-4 py-3 sm:px-12 sm:py-9';
+  };
 
   return (
     <div
-      className={`flex flex-col items-center justify-center h-screen ${
+      className={`flex flex-col items-center justify-center h-screen w-full ${
         personalActivated ? 'text-white' : 'text-black'
       }`}
     >
-      <div className="flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-center w-full p-4">
         <div className={`grid gap-1 grid-cols-${boardSize}`}>
           {board.map((row, i) => {
             return row.map((value, j) => {
@@ -121,9 +144,9 @@ export default function EightPuzzle() {
                 <button
                   key={`${i}-${j}`}
                   onClick={() => handleMove({ x: i, y: j })}
-                  className={`${
-                    value === 0 ? 'bg-amber-600' : 'bg-amber-500 hover:bg-amber-600'
-                  }  font-medium px-12 py-8 text-4xl rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600`}
+                  className={`${tileColor(
+                    value,
+                  )} font-medium text-4xl rounded-md focus:outline-none focus:ring-2  ${tileSize()}`}
                 >
                   {value === 0 ? '' : value}
                 </button>
@@ -131,23 +154,37 @@ export default function EightPuzzle() {
             });
           })}
         </div>
-        <div className="flex flex-col">
-          <div className="flex flex-row items-center justify-center mt-2">
-            <Button onClick={handleShuffle}>Shuffle</Button>
-            <Button onClick={handleReset}>Restart</Button>
+        <div className="flex flex-col mt-2">
+          <div className="flex flex-row items-center justify-center">
+            <Button theme={theme} onClick={handleShuffle}>
+              Shuffle
+            </Button>
+            <Button theme={theme} onClick={handleReset}>
+              Restart
+            </Button>
           </div>
-          <div className="flex flex-row items-center justify-center mt-2">
-            <Button onClick={handleSave}>Save board</Button>
-            <Button onClick={handleLoad}>Load save</Button>
+          <div className="flex flex-row items-center justify-center">
+            <Button theme={theme} onClick={handleSave}>
+              Save board
+            </Button>
+            <Button theme={theme} onClick={handleLoad}>
+              Load save
+            </Button>
           </div>
           <h1 className="text-xl font-bold text-center">Solving techniques (greedy)</h1>
-          <div className="flex items-center justify-center mt-2 flex-fow">
-            <Button onClick={handleSolveGreedy}>Best son</Button>
-            <Button onClick={handleSolveAStar}>Best grandson</Button>
-            <Button onClick={handleSolveCustom}>Happy grandfather</Button>
+          <div className="flex flex-wrap items-center justify-center">
+            <Button theme={theme} onClick={handleSolveGreedySon}>
+              Best son
+            </Button>
+            <Button theme={theme} onClick={handleSolveGreedyGranchildren}>
+              Best grandson
+            </Button>
+            <Button theme={theme} onClick={handleSolveCustom}>
+              Happy grandpa
+            </Button>
           </div>
         </div>
-        <div className="flex flex-row items-center justify-center mt-2">
+        <div className="flex flex-row flex-wrap items-center justify-center mt-2">
           <div className="flex flex-col items-center justify-center text-center">
             <label htmlFor="animationSpeed">
               Animation speed
@@ -206,21 +243,171 @@ export default function EightPuzzle() {
         </div>
       </div>
       {personalActivated && (
-        <div className="absolute w-full h-full bg-black -z-10 blur-xl">
+        <div className="absolute w-full h-full bg-black -z-10 ">
           <Image
             src="/rick-roll.gif"
             {...{
               fill: true,
               style: {
+                objectPosition: '30% 30%',
                 objectFit: 'cover',
-                objectPosition: 'center',
                 opacity: '60%',
               },
             }}
             alt="Rick Roll"
+            className="blur-lg"
           />
         </div>
       )}
     </div>
   );
 }
+
+export async function getServerSideProps() {
+  const colors = [
+    'red',
+    'orange',
+    'amber',
+    'yellow',
+    'lime',
+    'green',
+    'emerald',
+    'teal',
+    'cyan',
+    'sky',
+    'blue',
+    'indigo',
+    'violet',
+    'purple',
+    'fuchsia',
+    'pink',
+    'rose',
+  ];
+
+  const themes = colors.map((color) => {
+    return {
+      bg500: `bg-${color}-500`,
+      bg600: `bg-${color}-600`,
+      hoverBg600: `hover:bg-${color}-700`,
+      focusBg600: `focus:bg-${color}-600`,
+    };
+  });
+
+  // const themes: ColorPalette[] = [
+  //   {
+  //     bg500: 'bg-red-500',
+  //     bg600: 'bg-red-600',
+  //     hoverBg600: 'hover:bg-red-700',
+  //     focusBg600: 'focus:ring-red-600',
+  //   },
+  //   {
+  //     bg500: 'bg-orange-500',
+  //     bg600: 'bg-orange-600',
+  //     hoverBg600: 'hover:bg-orange-700',
+  //     focusBg600: 'focus:ring-orange-600',
+  //   },
+  //   {
+  //     bg500: 'bg-amber-500',
+  //     bg600: 'bg-amber-600',
+  //     hoverBg600: 'hover:bg-amber-700',
+  //     focusBg600: 'focus:ring-amber-600',
+  //   },
+  //   {
+  //     bg500: 'bg-yellow-500',
+  //     bg600: 'bg-yellow-600',
+  //     hoverBg600: 'hover:bg-yellow-700',
+  //     focusBg600: 'focus:ring-yellow-600',
+  //   },
+  //   {
+  //     bg500: 'bg-lime-500',
+  //     bg600: 'bg-lime-600',
+  //     hoverBg600: 'hover:bg-lime-700',
+  //     focusBg600: 'focus:ring-lime-600',
+  //   },
+  //   {
+  //     bg500: 'bg-green-500',
+  //     bg600: 'bg-green-600',
+  //     hoverBg600: 'hover:bg-green-700',
+  //     focusBg600: 'focus:ring-green-600',
+  //   },
+  //   {
+  //     bg500: 'bg-emerald-500',
+  //     bg600: 'bg-emerald-600',
+  //     hoverBg600: 'hover:bg-emerald-700',
+  //     focusBg600: 'focus:ring-emerald-600',
+  //   },
+  //   {
+  //     bg500: 'bg-teal-500',
+  //     bg600: 'bg-teal-600',
+  //     hoverBg600: 'hover:bg-teal-700',
+  //     focusBg600: 'focus:ring-teal-600',
+  //   },
+  //   {
+  //     bg500: 'bg-cyan-500',
+  //     bg600: 'bg-cyan-600',
+  //     hoverBg600: 'hover:bg-cyan-700',
+  //     focusBg600: 'focus:ring-cyan-600',
+  //   },
+  //   {
+  //     bg500: 'bg-sky-500',
+  //     bg600: 'bg-sky-600',
+  //     hoverBg600: 'hover:bg-sky-700',
+  //     focusBg600: 'focus:ring-sky-600',
+  //   },
+  //   {
+  //     bg500: 'bg-blue-500',
+  //     bg600: 'bg-blue-600',
+  //     hoverBg600: 'hover:bg-blue-700',
+  //     focusBg600: 'focus:ring-blue-600',
+  //   },
+  //   {
+  //     bg500: 'bg-indigo-500',
+  //     bg600: 'bg-indigo-600',
+  //     hoverBg600: 'hover:bg-indigo-700',
+  //     focusBg600: 'focus:ring-indigo-600',
+  //   },
+  //   {
+  //     bg500: 'bg-violet-500',
+  //     bg600: 'bg-violet-600',
+  //     hoverBg600: 'hover:bg-violet-700',
+  //     focusBg600: 'focus:ring-violet-600',
+  //   },
+  //   {
+  //     bg500: 'bg-purple-500',
+  //     bg600: 'bg-purple-600',
+  //     hoverBg600: 'hover:bg-purple-700',
+  //     focusBg600: 'focus:ring-purple-600',
+  //   },
+  //   {
+  //     bg500: 'bg-fuchsia-500',
+  //     bg600: 'bg-fuchsia-600',
+  //     hoverBg600: 'hover:bg-fuchsia-700',
+  //     focusBg600: 'focus:ring-fuchsia-600',
+  //   },
+  //   {
+  //     bg500: 'bg-pink-500',
+  //     bg600: 'bg-pink-600',
+  //     hoverBg600: 'hover:bg-pink-700',
+  //     focusBg600: 'focus:ring-pink-600',
+  //   },
+  //   {
+  //     bg500: 'bg-rose-500',
+  //     bg600: 'bg-rose-600',
+  //     hoverBg600: 'hover:bg-rose-700',
+  //     focusBg600: 'focus:ring-rose-600',
+  //   },
+  // ];
+  const index = Math.floor(Math.random() * themes.length);
+  return {
+    props: {
+      theme: themes[index],
+    },
+  };
+}
+
+type ColorPalette = {
+  bg500: string;
+  bg600: string;
+  hoverBg600: string;
+  focusBg600: string;
+};
