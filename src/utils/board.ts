@@ -15,7 +15,6 @@ export const generateCustomBoard = (sequence: string): Board => {
   const decoded = decode(sequence)
     .split(',')
     .map((item) => parseInt(item, 10));
-  console.log('decoded this: ', decoded);
 
   const root = decoded ? Math.floor(Math.sqrt(decoded.length)) : 3;
   if (decoded.length === root * root && new Set(decoded).size === decoded.length) {
@@ -26,7 +25,7 @@ export const generateCustomBoard = (sequence: string): Board => {
       const board: Board = Array.from({ length: root }, (_, i) =>
         Array.from({ length: root }, (_, j) => decoded[i * root + j]),
       );
-      console.log('board: ', board);
+
       return board;
     }
   }
