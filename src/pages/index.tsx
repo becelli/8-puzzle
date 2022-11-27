@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { generateInitialBoard, generateCustomBoard } from '../utils/board';
 import { Board, Position } from '../utils/types';
-import { solveGreedyTwoLayer, solveCustom, solveGreedyOneLayer } from '../utils/movements';
+import { solveGreedyTwoLayer, solveCustom, solveGreedyOneLayer, areBoardsEqual } from '../utils/movements';
 import { moveHelper, shuffle, isBoardSolved } from '../utils/movements';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -22,6 +22,7 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
   const router = useRouter();
   const initial = generateCustomBoard(router.query.game as string);
 
+  // Estados necessários para controlar o jogo
   const [personalActivated, setPersonalActivated] = useState(false);
   const [boardSize, setBoardSize] = useState<number>(initial.length);
   const [board, setBoard] = useState<Board>(initial);
@@ -35,27 +36,28 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
 
   const incrementTotalMoves = () => setTotalMoves(totalMoves + 1);
 
+  // Movimentação do bloco vazio
   const move = (position: Position, board: Board): Board => {
-    const result: Board = moveHelper(position, board);
-    if (result.toString() !== board.toString()) incrementTotalMoves();
-    return result;
+    const newBoard = moveHelper(position, board);
+    setBoard(newBoard);
+    if (!areBoardsEqual(newBoard, board)) incrementTotalMoves();
+    return newBoard;
   };
 
+  // "Lidadores" de eventos
   const handleShuffle = () => {
-    setBoard(shuffle(board, shuffleMoves));
-
+    const newBoard = shuffle(board, shuffleMoves);
+    setBoard(newBoard);
     setTotalMoves(0);
   };
 
   const handleSolveGreedySon = () => {
     const solution: Array<Position> = solveGreedyOneLayer(board);
-
     setAnimationQueue(solution);
   };
 
   const handleSolveGreedyGranchildren = () => {
     const solution: Array<Position> = solveGreedyTwoLayer(board);
-
     setAnimationQueue(solution);
   };
 
@@ -66,7 +68,9 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
   };
 
   const handleMove = (position: Position) => {
-    setBoard(move(position, board));
+    const newBoard = move(position, board);
+    setBoard(newBoard);
+    if (isBoardSolved(newBoard)) alert('Parabéns, você venceu!');
   };
 
   const handleReset = () => {
@@ -100,6 +104,8 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
     setBoard(generateInitialBoard(integer));
     setTotalMoves(0);
   };
+
+  // Fila de animação: executa a animação de acordo com a fila
   useEffect(() => {
     if (animationQueue.length === 0) return;
 
@@ -121,6 +127,7 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
     }
   }, [board]);
 
+  // Funções para colorir o tabuleiro de acordo com o tema
   const tileColor = (value: number) =>
     value === 0 ? `${theme.bg600}` : `${theme.bg500}  ${theme.hoverBg600} ${theme.focusBg600}`;
 
@@ -132,8 +139,8 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
 
   return (
     <div
-      className={`flex flex-col items-center justify-center h-screen w-full ${
-        personalActivated ? 'text-white' : 'text-black'
+      className={`flex flex-col items-center justify-center h-full md:h-screen w-full text-black ${
+        personalActivated ? 'md:text-white' : 'md:text-black'
       }`}
     >
       <div className="flex flex-col items-center justify-center w-full p-4">
@@ -155,39 +162,49 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
           })}
         </div>
         <div className="flex flex-col mt-2">
+          <div className="flex flex-row items-center justify-center mt-2">
+            <div className="flex flex-col items-center justify-center">
+              <label htmlFor="totalMoves">Movimentos</label>
+              <h1>{totalMoves}</h1>
+            </div>
+            <div className="flex flex-col items-center mb-1.5  ml-5">
+              <label htmlFor="isSolved">Resolvido?</label>
+              <input id="isSolved" type="checkbox" checked={isSolved} className="w-32" readOnly />
+            </div>
+          </div>
           <div className="flex flex-row items-center justify-center">
             <Button theme={theme} onClick={handleShuffle}>
-              Shuffle
+              Embaralhar
             </Button>
             <Button theme={theme} onClick={handleReset}>
-              Restart
+              Reiniciar
             </Button>
           </div>
           <div className="flex flex-row items-center justify-center">
             <Button theme={theme} onClick={handleSave}>
-              Save board
+              Salvar atual
             </Button>
             <Button theme={theme} onClick={handleLoad}>
-              Load save
+              Restaurar
             </Button>
           </div>
-          <h1 className="text-xl font-bold text-center">Solving techniques (greedy)</h1>
+          <h1 className="text-xl font-bold text-center">técnicas de resolução (gulosas)</h1>
           <div className="flex flex-wrap items-center justify-center">
             <Button theme={theme} onClick={handleSolveGreedySon}>
-              Best son
+              Melhor filho
             </Button>
             <Button theme={theme} onClick={handleSolveGreedyGranchildren}>
-              Best grandson
+              Melhor neto
             </Button>
             <Button theme={theme} onClick={handleSolveCustom}>
-              Happy grandpa
+              Vovô feliz
             </Button>
           </div>
         </div>
         <div className="flex flex-row flex-wrap items-center justify-center mt-2">
           <div className="flex flex-col items-center justify-center text-center">
             <label htmlFor="animationSpeed">
-              Animation speed
+              Velocidade da animação (ms)
               <br />
             </label>
             <input
@@ -202,7 +219,7 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
             <span>{animationSpeed}ms</span>
           </div>
           <div className="flex flex-col items-center justify-center ml-2 text-center">
-            <label htmlFor="shuffleMoves">Shuffle Moves</label>
+            <label htmlFor="shuffleMoves">Movimentos de embaralhamento</label>
             <input
               id="shuffleMoves"
               type="range"
@@ -217,7 +234,7 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
           </div>
 
           <div className="flex flex-col items-center justify-center ml-2 text-center">
-            <label htmlFor="boardSize">Board size</label>
+            <label htmlFor="boardSize">Tamanho do tabuleiro</label>
             <input
               id="boardSize"
               type="range"
@@ -231,19 +248,9 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
             <span>{boardSize}</span>
           </div>
         </div>
-        <div className="flex flex-row items-center justify-center mt-2">
-          <div className="flex flex-col items-center justify-center">
-            <label htmlFor="totalMoves">Total Moves</label>
-            <h1>{totalMoves}</h1>
-          </div>
-          <div className="flex flex-col items-center justify-center ml-2">
-            <label htmlFor="isSolved">Solved?</label>
-            <input id="isSolved" type="checkbox" checked={isSolved} className="w-32" readOnly />
-          </div>
-        </div>
       </div>
       {personalActivated && (
-        <div className="absolute w-full h-full bg-black -z-10 ">
+        <div className="absolute hidden w-full h-full bg-black md:block -z-10 ">
           <Image
             src="/rick-roll.gif"
             {...{
@@ -255,7 +262,7 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
               },
             }}
             alt="Rick Roll"
-            className="blur-lg"
+            className="blur-md"
           />
         </div>
       )}
@@ -263,140 +270,116 @@ export default function EightPuzzle({ theme }: { theme: ColorPalette }) {
   );
 }
 
+/**
+ *
+ * @returns Cor do tema a ser utilizado
+ */
 export async function getServerSideProps() {
-  const colors = [
-    'red',
-    'orange',
-    'amber',
-    'yellow',
-    'lime',
-    'green',
-    'emerald',
-    'teal',
-    'cyan',
-    'sky',
-    'blue',
-    'indigo',
-    'violet',
-    'purple',
-    'fuchsia',
-    'pink',
-    'rose',
+  const themes: ColorPalette[] = [
+    {
+      bg500: 'bg-red-500',
+      bg600: 'bg-red-600',
+      hoverBg600: 'hover:bg-red-700',
+      focusBg600: 'focus:ring-red-600',
+    },
+    {
+      bg500: 'bg-orange-500',
+      bg600: 'bg-orange-600',
+      hoverBg600: 'hover:bg-orange-700',
+      focusBg600: 'focus:ring-orange-600',
+    },
+    {
+      bg500: 'bg-amber-500',
+      bg600: 'bg-amber-600',
+      hoverBg600: 'hover:bg-amber-700',
+      focusBg600: 'focus:ring-amber-600',
+    },
+    {
+      bg500: 'bg-yellow-500',
+      bg600: 'bg-yellow-600',
+      hoverBg600: 'hover:bg-yellow-700',
+      focusBg600: 'focus:ring-yellow-600',
+    },
+    {
+      bg500: 'bg-lime-500',
+      bg600: 'bg-lime-600',
+      hoverBg600: 'hover:bg-lime-700',
+      focusBg600: 'focus:ring-lime-600',
+    },
+    {
+      bg500: 'bg-green-500',
+      bg600: 'bg-green-600',
+      hoverBg600: 'hover:bg-green-700',
+      focusBg600: 'focus:ring-green-600',
+    },
+    {
+      bg500: 'bg-emerald-500',
+      bg600: 'bg-emerald-600',
+      hoverBg600: 'hover:bg-emerald-700',
+      focusBg600: 'focus:ring-emerald-600',
+    },
+    {
+      bg500: 'bg-teal-500',
+      bg600: 'bg-teal-600',
+      hoverBg600: 'hover:bg-teal-700',
+      focusBg600: 'focus:ring-teal-600',
+    },
+    {
+      bg500: 'bg-cyan-500',
+      bg600: 'bg-cyan-600',
+      hoverBg600: 'hover:bg-cyan-700',
+      focusBg600: 'focus:ring-cyan-600',
+    },
+    {
+      bg500: 'bg-sky-500',
+      bg600: 'bg-sky-600',
+      hoverBg600: 'hover:bg-sky-700',
+      focusBg600: 'focus:ring-sky-600',
+    },
+    {
+      bg500: 'bg-blue-500',
+      bg600: 'bg-blue-600',
+      hoverBg600: 'hover:bg-blue-700',
+      focusBg600: 'focus:ring-blue-600',
+    },
+    {
+      bg500: 'bg-indigo-500',
+      bg600: 'bg-indigo-600',
+      hoverBg600: 'hover:bg-indigo-700',
+      focusBg600: 'focus:ring-indigo-600',
+    },
+    {
+      bg500: 'bg-violet-500',
+      bg600: 'bg-violet-600',
+      hoverBg600: 'hover:bg-violet-700',
+      focusBg600: 'focus:ring-violet-600',
+    },
+    {
+      bg500: 'bg-purple-500',
+      bg600: 'bg-purple-600',
+      hoverBg600: 'hover:bg-purple-700',
+      focusBg600: 'focus:ring-purple-600',
+    },
+    {
+      bg500: 'bg-fuchsia-500',
+      bg600: 'bg-fuchsia-600',
+      hoverBg600: 'hover:bg-fuchsia-700',
+      focusBg600: 'focus:ring-fuchsia-600',
+    },
+    {
+      bg500: 'bg-pink-500',
+      bg600: 'bg-pink-600',
+      hoverBg600: 'hover:bg-pink-700',
+      focusBg600: 'focus:ring-pink-600',
+    },
+    {
+      bg500: 'bg-rose-500',
+      bg600: 'bg-rose-600',
+      hoverBg600: 'hover:bg-rose-700',
+      focusBg600: 'focus:ring-rose-600',
+    },
   ];
 
-  const themes = colors.map((color) => {
-    return {
-      bg500: `bg-${color}-500`,
-      bg600: `bg-${color}-600`,
-      hoverBg600: `hover:bg-${color}-700`,
-      focusBg600: `focus:bg-${color}-600`,
-    };
-  });
-
-  // const themes: ColorPalette[] = [
-  //   {
-  //     bg500: 'bg-red-500',
-  //     bg600: 'bg-red-600',
-  //     hoverBg600: 'hover:bg-red-700',
-  //     focusBg600: 'focus:ring-red-600',
-  //   },
-  //   {
-  //     bg500: 'bg-orange-500',
-  //     bg600: 'bg-orange-600',
-  //     hoverBg600: 'hover:bg-orange-700',
-  //     focusBg600: 'focus:ring-orange-600',
-  //   },
-  //   {
-  //     bg500: 'bg-amber-500',
-  //     bg600: 'bg-amber-600',
-  //     hoverBg600: 'hover:bg-amber-700',
-  //     focusBg600: 'focus:ring-amber-600',
-  //   },
-  //   {
-  //     bg500: 'bg-yellow-500',
-  //     bg600: 'bg-yellow-600',
-  //     hoverBg600: 'hover:bg-yellow-700',
-  //     focusBg600: 'focus:ring-yellow-600',
-  //   },
-  //   {
-  //     bg500: 'bg-lime-500',
-  //     bg600: 'bg-lime-600',
-  //     hoverBg600: 'hover:bg-lime-700',
-  //     focusBg600: 'focus:ring-lime-600',
-  //   },
-  //   {
-  //     bg500: 'bg-green-500',
-  //     bg600: 'bg-green-600',
-  //     hoverBg600: 'hover:bg-green-700',
-  //     focusBg600: 'focus:ring-green-600',
-  //   },
-  //   {
-  //     bg500: 'bg-emerald-500',
-  //     bg600: 'bg-emerald-600',
-  //     hoverBg600: 'hover:bg-emerald-700',
-  //     focusBg600: 'focus:ring-emerald-600',
-  //   },
-  //   {
-  //     bg500: 'bg-teal-500',
-  //     bg600: 'bg-teal-600',
-  //     hoverBg600: 'hover:bg-teal-700',
-  //     focusBg600: 'focus:ring-teal-600',
-  //   },
-  //   {
-  //     bg500: 'bg-cyan-500',
-  //     bg600: 'bg-cyan-600',
-  //     hoverBg600: 'hover:bg-cyan-700',
-  //     focusBg600: 'focus:ring-cyan-600',
-  //   },
-  //   {
-  //     bg500: 'bg-sky-500',
-  //     bg600: 'bg-sky-600',
-  //     hoverBg600: 'hover:bg-sky-700',
-  //     focusBg600: 'focus:ring-sky-600',
-  //   },
-  //   {
-  //     bg500: 'bg-blue-500',
-  //     bg600: 'bg-blue-600',
-  //     hoverBg600: 'hover:bg-blue-700',
-  //     focusBg600: 'focus:ring-blue-600',
-  //   },
-  //   {
-  //     bg500: 'bg-indigo-500',
-  //     bg600: 'bg-indigo-600',
-  //     hoverBg600: 'hover:bg-indigo-700',
-  //     focusBg600: 'focus:ring-indigo-600',
-  //   },
-  //   {
-  //     bg500: 'bg-violet-500',
-  //     bg600: 'bg-violet-600',
-  //     hoverBg600: 'hover:bg-violet-700',
-  //     focusBg600: 'focus:ring-violet-600',
-  //   },
-  //   {
-  //     bg500: 'bg-purple-500',
-  //     bg600: 'bg-purple-600',
-  //     hoverBg600: 'hover:bg-purple-700',
-  //     focusBg600: 'focus:ring-purple-600',
-  //   },
-  //   {
-  //     bg500: 'bg-fuchsia-500',
-  //     bg600: 'bg-fuchsia-600',
-  //     hoverBg600: 'hover:bg-fuchsia-700',
-  //     focusBg600: 'focus:ring-fuchsia-600',
-  //   },
-  //   {
-  //     bg500: 'bg-pink-500',
-  //     bg600: 'bg-pink-600',
-  //     hoverBg600: 'hover:bg-pink-700',
-  //     focusBg600: 'focus:ring-pink-600',
-  //   },
-  //   {
-  //     bg500: 'bg-rose-500',
-  //     bg600: 'bg-rose-600',
-  //     hoverBg600: 'hover:bg-rose-700',
-  //     focusBg600: 'focus:ring-rose-600',
-  //   },
-  // ];
   const index = Math.floor(Math.random() * themes.length);
   return {
     props: {
